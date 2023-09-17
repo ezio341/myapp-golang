@@ -2,6 +2,7 @@ package configs
 
 import (
 	"fmt"
+	departmentDB "myproject/models/department/database"
 	roleDB "myproject/models/role/database"
 	userDB "myproject/models/user/database"
 	"os"
@@ -35,6 +36,7 @@ func InitDatabase() {
 func Migration() {
 	DB.AutoMigrate(userDB.User{})
 	DB.AutoMigrate(roleDB.Role{})
+	DB.AutoMigrate(departmentDB.Department{})
 }
 
 func LoadEnv() {
