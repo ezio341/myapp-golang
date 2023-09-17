@@ -9,9 +9,8 @@ import (
 type User struct {
 	base.Model
 	Username string        `json:"username"`
-	Email    string        `json:"email"`
+	Email    string        `json:"email" gorm:"index:,unique"`
 	Password string        `json:"password"`
-	Admin    bool          `json:"admin" gorm:"type:bool"`
 	RoleID   uint          `json:"role_id"`
 	Role     database.Role `gorm:"foreignKey:RoleID"`
 }
@@ -30,6 +29,5 @@ func (user *User) MapRegister(userRegister request.UserRegister) {
 
 func (user *User) MapEdit(userEdit request.EditUser) {
 	user.Username = userEdit.Username
-	user.Admin = userEdit.Admin
 	user.RoleID = userEdit.RoleID
 }
