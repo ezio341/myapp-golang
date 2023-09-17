@@ -22,6 +22,7 @@ func main() {
 	configs.InitDatabase()
 	routes.InitRoutesUser(e)
 	routes.InitRoutesRole(e)
+	routes.InitRoutesDepartment(e)
 	e.Start(GetPort())
 }
 
