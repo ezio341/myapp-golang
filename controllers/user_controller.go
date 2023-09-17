@@ -2,10 +2,9 @@ package controllers
 
 import (
 	"errors"
-	"fmt"
 	"myproject/configs"
 	"myproject/models/base"
-	"myproject/models/user/database"
+	userDB "myproject/models/user/database"
 	"myproject/models/user/request"
 	"myproject/models/user/response"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func AddUser(c echo.Context) error {
@@ -26,11 +26,12 @@ func AddUser(c echo.Context) error {
 		})
 	}
 
-	var userDatabase database.User
+	var userDatabase userDB.User
 	userDatabase.Username = userRegister.Username
 	userDatabase.Email = userRegister.Email
 	userDatabase.Password = userRegister.Password
-	result := configs.DB.Create(&userDatabase)
+	userDatabase.RoleID = userRegister.RoleID
+	result := configs.DB.Save(&userDatabase)
 
 	if result.Error != nil {
 		return c.JSON(http.StatusInternalServerError, base.BaseResponse{
@@ -42,7 +43,6 @@ func AddUser(c echo.Context) error {
 
 	var userResponse response.UserResponse
 	userResponse.MapUserResponse(userDatabase)
-	fmt.Println(userResponse)
 
 	return c.JSON(http.StatusCreated, base.BaseResponse{
 		Status:  true,
@@ -62,13 +62,17 @@ func EditUser(c echo.Context) error {
 		})
 	}
 
-	var userDatabase database.User
+	var userDatabase userDB.User
 	userDatabase.ID = uint(id)
+	res := configs.DB.Model(&userDatabase).Where("id = ?", id).Updates(&editUser).Preload(clause.Associations).First(&userDatabase)
 
-	res := configs.DB.Model(&userDatabase).Updates(&editUser)
-	fmt.Println(userDatabase)
-
-	if res.Error != nil {
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		return c.JSON(http.StatusInternalServerError, base.BaseResponse{
+			Status:  false,
+			Message: "User not found",
+			Data:    nil,
+		})
+	} else if res.Error != nil {
 		return c.JSON(http.StatusInternalServerError, base.BaseResponse{
 			Status:  false,
 			Message: "Failed update user",
@@ -78,7 +82,6 @@ func EditUser(c echo.Context) error {
 
 	var userResponse response.UserResponse
 	userResponse.MapUserResponse(userDatabase)
-	fmt.Println(userResponse)
 
 	return c.JSON(http.StatusCreated, base.BaseResponse{
 		Status:  true,
@@ -99,7 +102,7 @@ func Login(c echo.Context) error {
 		})
 	}
 
-	var userDatabase database.User
+	var userDatabase userDB.User
 	userDatabase.MapLogin(login)
 
 	result := configs.DB.Where(
@@ -127,17 +130,8 @@ func Login(c echo.Context) error {
 }
 
 func GetUsers(c echo.Context) error {
-	var users []database.User
-
-	result := configs.DB.Find(&users)
-
-	if result.Error != nil {
-		return c.JSON(http.StatusInternalServerError, base.BaseResponse{
-			Status:  false,
-			Message: "Failed get users",
-			Data:    nil,
-		})
-	}
+	var users []userDB.User
+	configs.DB.Preload(clause.Associations).Find(&users)
 
 	userArrayResponse := make([]response.UserResponse, len(users))
 	for i, user := range users {
@@ -161,10 +155,10 @@ func GetUser(c echo.Context) error {
 		})
 	}
 
-	var user database.User
+	var user userDB.User
 	user.ID = uint(id)
 
-	result := configs.DB.First(&user)
+	result := configs.DB.Preload(clause.Associations).First(&user)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -200,13 +194,13 @@ func DeleteUser(c echo.Context) error {
 			Data:    nil,
 		})
 	}
-	user := database.User{
+	user := userDB.User{
 		Model: base.Model{
 			ID: uint(id),
 		},
 	}
 
-	result := configs.DB.First(&user).Delete(&user)
+	result := configs.DB.Preload(clause.Associations).First(&user).Delete(&user)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return c.JSON(http.StatusNotFound, base.BaseResponse{

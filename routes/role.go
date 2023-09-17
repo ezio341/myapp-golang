@@ -13,5 +13,6 @@ func InitRoutesRole(e *echo.Echo) {
 	auth.Use(echojwt.JWT([]byte(os.Getenv("JWT_SECRET_KEY"))))
 	auth.GET("/roles", controllers.GetRoles)
 	auth.POST("/role", controllers.AddRole)
+	auth.DELETE("/role/:id", controllers.DeleteRole)
 
 }

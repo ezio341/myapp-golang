@@ -1,7 +1,8 @@
 package middlewares
 
 import (
-	"myproject/models/user/database"
+	roleDB "myproject/models/role/database"
+	userDB "myproject/models/user/database"
 	"os"
 	"time"
 
@@ -9,17 +10,17 @@ import (
 )
 
 type jwtCustomClaims struct {
-	ID       uint   `json:"id"`
-	Username string `json:"username"`
-	Admin    bool   `json:"admin"`
+	ID       uint        `json:"id"`
+	Username string      `json:"username"`
+	Role     roleDB.Role `json:"role"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(user database.User) string {
+func GenerateToken(user userDB.User) string {
 	claims := &jwtCustomClaims{
 		user.ID,
 		user.Username,
-		user.Admin,
+		user.Role,
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
 		},
