@@ -2,10 +2,14 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"myproject/configs"
 	"myproject/models/base"
+	employeeDB "myproject/models/employee_detail/database"
+	employeeReq "myproject/models/employee_detail/request"
 	userDB "myproject/models/user/database"
 	"myproject/models/user/request"
+	userReq "myproject/models/user/request"
 	"myproject/models/user/response"
 	"net/http"
 	"strconv"
@@ -27,13 +31,22 @@ func AddUser(c echo.Context) error {
 	}
 
 	var userDatabase userDB.User
+	var employeeDatabase employeeDB.EmployeeDetail
+
+	employeeDatabase.CurrentSalary = userRegister.CurrentSalary
+	employeeDatabase.DepartmentID = userRegister.DepartmentID
+	employeeDatabase.PositionID = userRegister.PositionID
+	resultEmployee := configs.DB.Save(&employeeDatabase)
+
 	userDatabase.Username = userRegister.Username
 	userDatabase.Email = userRegister.Email
 	userDatabase.Password = userRegister.Password
 	userDatabase.RoleID = userRegister.RoleID
-	result := configs.DB.Save(&userDatabase)
+	userDatabase.EmployeeDetailID = employeeDatabase.ID
 
-	if result.Error != nil {
+	result := configs.DB.Save(&userDatabase).Preload(clause.Associations).First(&userDatabase)
+
+	if result.Error != nil || resultEmployee.Error != nil {
 		return c.JSON(http.StatusInternalServerError, base.BaseResponse{
 			Status:  false,
 			Message: "Failed store user",
@@ -51,7 +64,7 @@ func AddUser(c echo.Context) error {
 	})
 }
 func EditUser(c echo.Context) error {
-	var editUser request.EditUser
+	var editUser userReq.EditUser
 	id, err := strconv.ParseUint(c.Param("id"), 10, strconv.IntSize)
 	c.Bind(&editUser)
 	if !editUser.IsValid() || err != nil {
@@ -64,15 +77,28 @@ func EditUser(c echo.Context) error {
 
 	var userDatabase userDB.User
 	userDatabase.ID = uint(id)
-	res := configs.DB.Model(&userDatabase).Where("id = ?", id).Updates(&editUser).Preload(clause.Associations).First(&userDatabase)
+	userDatabase.MapEdit(editUser)
+	resUser := configs.DB.Model(&userDatabase).Updates(&userDatabase).Preload(clause.Associations).First(&userDatabase)
 
-	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+	var employeeDatabase employeeDB.EmployeeDetail
+	employeeDatabase.ID = userDatabase.EmployeeDetail.ID
+	fmt.Print(editUser)
+	employeeDatabase.MapEditEmployeeDetail(employeeReq.EditEmployeeDetail{
+		DepartmentID:  editUser.DepartmentID,
+		PositionID:    editUser.PositionID,
+		CurrentSalary: editUser.CurrentSalary,
+	})
+
+	resEmployee := configs.DB.Model(&employeeDatabase).Updates(&employeeDatabase).Preload(clause.Associations).First(&employeeDatabase)
+	userDatabase.EmployeeDetail = employeeDatabase
+
+	if errors.Is(resUser.Error, gorm.ErrRecordNotFound) {
 		return c.JSON(http.StatusInternalServerError, base.BaseResponse{
 			Status:  false,
 			Message: "User not found",
 			Data:    nil,
 		})
-	} else if res.Error != nil {
+	} else if resUser.Error != nil && resEmployee.Error != nil {
 		return c.JSON(http.StatusInternalServerError, base.BaseResponse{
 			Status:  false,
 			Message: "Failed update user",
@@ -109,7 +135,7 @@ func Login(c echo.Context) error {
 		"email = ? AND password= ?",
 		userDatabase.Email,
 		userDatabase.Password,
-	).First(&userDatabase)
+	).Preload(clause.Associations).First(&userDatabase)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return c.JSON(http.StatusUnauthorized, base.BaseResponse{
@@ -131,7 +157,7 @@ func Login(c echo.Context) error {
 
 func GetUsers(c echo.Context) error {
 	var users []userDB.User
-	configs.DB.Preload(clause.Associations).Find(&users)
+	configs.DB.Preload(clause.Associations).Preload("EmployeeDetail.Department").Preload("EmployeeDetail.Position").Find(&users)
 
 	userArrayResponse := make([]response.UserResponse, len(users))
 	for i, user := range users {
@@ -158,7 +184,7 @@ func GetUser(c echo.Context) error {
 	var user userDB.User
 	user.ID = uint(id)
 
-	result := configs.DB.Preload(clause.Associations).First(&user)
+	result := configs.DB.Preload(clause.Associations).Preload("EmployeeDetail.Department").Preload("EmployeeDetail.Position").First(&user)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -220,7 +246,7 @@ func DeleteUser(c echo.Context) error {
 	userResponse.MapUserResponse(user)
 
 	return c.JSON(http.StatusOK, base.BaseResponse{
-		Status:  false,
+		Status:  true,
 		Message: "Success delete user",
 		Data:    userResponse,
 	})
