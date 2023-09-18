@@ -36,7 +36,7 @@ func main() {
 		close(idleConnsClosed)
 	}()
 	e := echo.New()
-	configs.LoadEnv()
+	// configs.LoadEnv()
 	configs.InitDatabase()
 	routes.InitRoutesUser(e)
 	routes.InitRoutesRole(e)
