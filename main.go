@@ -21,14 +21,14 @@ func ErrorMap() map[error]int {
 
 func main() {
 	var srv http.Server
-
+	// close idle connection
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt)
 		<-sigint
 
-		// We received an interrupt signal, shut down.
+		// received an interrupt signal, shut down.
 		if err := srv.Shutdown(context.Background()); err != nil {
 			// Error from closing listeners, or context timeout:
 			log.Printf("HTTP server Shutdown: %v", err)
